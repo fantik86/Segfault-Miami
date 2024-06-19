@@ -39,7 +39,7 @@ int main() {
 
   controls_t controls = createControls('w', 's', 'a', 'd', 'e', 'q', 'r'); /* TODO: LMB & RMB bind */
   character_sprites_t sprites = createSprites(renderer, "images/player_sprites/char1");
-  player_t player = createPlayer(0, controls, sprites); /* TODO: Make PlayerID system */
+  player_t player = createPlayer(0, vector2(0, 0), -90, CHAR_STATE_IDLE, controls, sprites); /* TODO: Make PlayerID system */
   
   /* Game init end */
 
@@ -69,11 +69,9 @@ int main() {
     }
 
     
-    SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
     SDL_RenderClear(renderer);
     
-    SDL_SetRenderDrawColor(renderer, 0, 255, 0, 255);
-    SDL_RenderFillRect(renderer, &rect);
+    redrawPlayer(renderer, player);
     
     SDL_RenderPresent(renderer);
   }

@@ -3,6 +3,15 @@
 
 #include <stdint.h>
 #include <stdbool.h>
+#include "vectors.h"
+
+typedef enum {
+  CHAR_STATE_IDLE,
+  CHAR_STATE_WALKING,
+  CHAR_STATE_ATTACKING,
+  CHAR_STATE_WEAPON_DROPPING,
+  CHAR_STATE_LAY
+} character_state_t;
 
 typedef struct {
   uint8_t walk_forward;       /* Walk forward                     */
@@ -27,10 +36,13 @@ typedef struct {
 
 typedef struct {
   uint8_t id;
+  vector2_t position;
+  int16_t rotation;
+  character_state_t state;
   controls_t controls;
   character_sprites_t sprites;
-  int8_t combo_counter;
-  int8_t knockedDown_timeout;
+  uint8_t combo_counter;
+  uint8_t knockedDown_timeout;
   bool isAttacking;
   bool isAlive;
 } player_t;
@@ -43,8 +55,10 @@ controls_t createControls(uint8_t walk_forward, uint8_t walk_backward,
 
 character_sprites_t createSprites(SDL_Renderer* renderer, char* directory);    /* Takes directory to the folder with sprites and processing it */
 
-player_t createPlayer(uint8_t id, controls_t controls, character_sprites_t sprites);
+player_t createPlayer(uint8_t id, vector2_t position, int16_t rotation, character_state_t state, controls_t controls, character_sprites_t sprites);
 
+void updatePlayer(player_t* player, vector2_t position, int16_t rotation, character_state_t state, uint8_t combo_counter, uint8_t knockedDown_timeout, bool isAttacking, bool isAlive);
 
+void redrawPlayer(SDL_Renderer* renderer, player_t player);
 
 #endif
