@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdbool.h>
+#include <pthread.h>
 
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_image.h>
@@ -8,12 +9,14 @@
 #include "log.h"
 #include "game_configuration.h"
 
+#define PLAYER_STEP_LENGTH 1
+
 bool isGameRunning = true;
 
 
 int main() {
 
-  setvbuf(stdout, NULL, _IONBF, 0); /* Disabling buffering to make printf work */
+  setvbuf(stdout, NULL, _IONBF, 0); /* Disabling buffering to make printf work properly */
   
   if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS))
     printf("SDL init error: %s", SDL_GetError());
@@ -28,51 +31,76 @@ int main() {
   SDL_Event event;
   SDL_RenderSetLogicalSize(renderer, WINDOW_WIDTH, WINDOW_HEIGHT); /* TODO: Make reading resolution from file */
 
-  SDL_Rect rect = {
-    .x = 640 / 4 / 2,
-    .y = 480 / 4 / 2,
-    .w = 1,
-    .h = 1
-  };
-
   /* Game init start */
 
   controls_t controls = createControls('w', 's', 'a', 'd', 'e', 'q', 'r'); /* TODO: LMB & RMB bind */
   character_sprites_t sprites = createSprites(renderer, "images/player_sprites/char1");
   player_t player = createPlayer(0, vector2(0, 0), -90, CHAR_STATE_IDLE, controls, sprites); /* TODO: Make PlayerID system */
-  
+
+  uint8_t controls_forward = player.controls.walk_forward;
+  uint8_t controls_backward = player.controls.walk_backward;
+  uint8_t controls_left = player.controls.walk_left;
+  uint8_t controls_right = player.controls.walk_right;
+
+  char current_key = (char)(event.key.keysym.sym);
+    
   /* Game init end */
 
-  
   while (isGameRunning) {
     if (SDL_PollEvent(&event)) {
       switch (event.type) {
       case SDL_QUIT:
 	SDL_Quit();
 	break;
-      case SDL_KEYDOWN:
-	switch ((char)(event.key.keysym.sym)) {
-	case 'w':
-	  log_info("Info test");
-	  break;
-	case 'a':
-	  log_error("Error test");
-	  break;
-	case 's':
-	  log_warn("Warn test");
-	  break;
-	case 'd':
-	  log_game("Game test");
-	  break;
+      }
+	if (event.type == SDL_KEYUP) {
+	  current_key = (char)(event.key.keysym.sym);
+	  if (current_key == controls_forward ||
+	      current_key == controls_backward ||
+	      current_key == controls_left ||
+	      current_key == controls_right) {
+	    updatePlayerState(&player, CHAR_STATE_IDLE);
+	  }
+	  if (current_key == controls_forward) {
+	    changeDownedControls(&(player.downed_controls), CONTROLS_WALK_FORWARD, 0);
+	  } else if (current_key == controls_backward) {
+	    changeDownedControls(&(player.downed_controls), CONTROLS_WALK_BACKWARD, 0);
+	  }
+	  if (current_key == controls_left) {
+	    changeDownedControls(&(player.downed_controls), CONTROLS_WALK_RIGHT, 0);
+	  } else if (current_key == controls_right) {
+	    changeDownedControls(&(player.downed_controls), CONTROLS_WALK_LEFT, 0);
+	  }
+	} else if (event.type == SDL_KEYDOWN) {
+	  current_key = (char)(event.key.keysym.sym);
+	  if ((current_key == controls_forward ||
+	     current_key == controls_backward ||
+	     current_key == controls_left ||
+	       current_key == controls_right) && player.state == CHAR_STATE_IDLE) {
+	    updatePlayerState(&player, CHAR_STATE_WALKING);
+	  }
+          if (current_key == controls_forward) {
+	    changeDownedControls(&(player.downed_controls), CONTROLS_WALK_FORWARD, PLAYER_STEP_LENGTH);
+	  } else if (current_key == controls_backward) {
+	    changeDownedControls(&(player.downed_controls), CONTROLS_WALK_BACKWARD, PLAYER_STEP_LENGTH);
+	  }
+	  if (current_key == controls_left) {
+	    changeDownedControls(&(player.downed_controls), CONTROLS_WALK_RIGHT, PLAYER_STEP_LENGTH);
+	  } else if (current_key == controls_right) {
+	    changeDownedControls(&(player.downed_controls), CONTROLS_WALK_LEFT, PLAYER_STEP_LENGTH);
+	  }
 	}
       }
-    }
-
     
     SDL_RenderClear(renderer);
-    
-    redrawPlayer(renderer, player);
+
+    redrawPlayer(renderer, &player);
     
     SDL_RenderPresent(renderer);
+
+    player.position.y -= player.downed_controls.walk_forward;
+    player.position.y += player.downed_controls.walk_backward;
+    player.position.x += player.downed_controls.walk_right;
+    player.position.x -= player.downed_controls.walk_left;
   }
 }

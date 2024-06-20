@@ -7,6 +7,7 @@
 #include "player.h"
 #include "log.h"
 #include "vectors.h"
+#include "game_configuration.h"
 
 struct dirent *de;
 DIR *dr;
@@ -18,25 +19,7 @@ char* nrwcat(char* str1, const char* str2) { /* No-rewrite concatenation functio
 
   return result;
 }
-/*
-char* appendtodir(char* dir, const char* str2) {
-  char* result;
-  if (dir[strlen(dir)] == '/' && str2[0] == '/') {
-    result = (char*)malloc(strlen(dir) - 1);
-    memcpy(result, dir, strlen(dir) - 1);
-    result = nrwcat(result, str2);
-    return result;
-  } else if (dir[strlen(dir)] != '/' && str2[0] != '/') {
-    result = (char*)malloc(strlen(dir) + strlen(str2));
-    memcpy(result, dir, strlen(dir));
-    result[strlen(dir) + 1] = '/';
-    memcpy(result + strlen(dir) + 2, str2, strlen(str2));
-    return result;
-  } else {
-    return nrwcat(dir, str2);
-  }
-}
-*/
+
 char* appendtodir(char* dir, const char* str2) {
     char* result;
     size_t dir_len = strlen(dir);
@@ -88,8 +71,7 @@ uint8_t dir_count_files(const char* directory) {
   while ((de = readdir(dr)) != NULL)
     counter++;
   
-  int cldir = closedir(dr);
-  if (cldir == -1) {
+  if (closedir(dr) == -1) {
     printf("Failed to close directory\n");
   }
   
@@ -108,16 +90,17 @@ SDL_Surface* load_image(char* directory) {
 
 SDL_Texture** texture_sequence_copy(SDL_Renderer* renderer, char* directory) {
   SDL_Texture** texture_sequence;
-  uint8_t sequence_count = dir_count_files(directory);
-  
+  uint8_t sequence_count = dir_count_files(directory) - 2; /* minus two because '.' and '..' (most likely lol) */
   texture_sequence = (SDL_Texture**)malloc(sequence_count * sizeof(SDL_Texture*));
 
   dr = opendir(directory);
   
   for (int i = 0; (de = readdir(dr)) != NULL; i++)
     if (strcmp(de->d_name + (strlen(de->d_name) - 4), ".png") == 0 ||
-	strcmp(de->d_name + (strlen(de->d_name) - 4), ".jpg") == 0)
+	strcmp(de->d_name + (strlen(de->d_name) - 4), ".jpg") == 0) {
+      printf("TEXTURE: INDEX IS %d; PATH IS %s\n", i, appendtodir(directory, de->d_name));
       texture_sequence[i] = SDL_CreateTextureFromSurface(renderer, load_image(appendtodir(directory, de->d_name)));
+    }
   closedir(dr);
   
   return texture_sequence;
@@ -156,7 +139,7 @@ character_sprites_t createSprites(SDL_Renderer* renderer, char* directory) {
   SDL_Texture* lay_front = SDL_CreateTextureFromSurface(renderer, load_image(appendtodir(directory, "/lay_front.png")));
   SDL_Texture* lay_back = SDL_CreateTextureFromSurface(renderer, load_image(appendtodir(directory, "/lay_back.png")));
   SDL_Texture* lay_wall = SDL_CreateTextureFromSurface(renderer, load_image(appendtodir(directory, "/lay_wall.png")));
-    
+  
   character_sprites_t sprites = {
     .idle = idle,
     .walking = walking,
@@ -173,6 +156,9 @@ character_sprites_t createSprites(SDL_Renderer* renderer, char* directory) {
 
 player_t createPlayer(uint8_t id, vector2_t position, int16_t rotation, character_state_t state, controls_t controls, character_sprites_t sprites) {
   /* TODO: Support of online room logic, adding id and player to player list */
+
+  controls_t downed_controls = createControls(0, 0, 0, 0, 0, 0, 0);
+  
   player_t player = {
     .id = id,
     .position = position,
@@ -180,8 +166,11 @@ player_t createPlayer(uint8_t id, vector2_t position, int16_t rotation, characte
     .state = state,
     .controls = controls,
     .sprites = sprites,
+    .current_frame = 0,
+    .next_anim_frame_time = 0,
     .combo_counter = 0,
     .knockedDown_timeout = 0,
+    .downed_controls = downed_controls,
     .isAttacking = false,
     .isAlive = true
   };
@@ -190,7 +179,8 @@ player_t createPlayer(uint8_t id, vector2_t position, int16_t rotation, characte
 }
 
 void updatePlayer(player_t* player, vector2_t position, int16_t rotation,
-		  character_state_t state, uint8_t combo_counter, uint8_t knockedDown_timeout, bool isAttacking, bool isAlive) {
+		  character_state_t state, uint8_t combo_counter,
+		  uint8_t knockedDown_timeout, bool isAttacking, bool isAlive) {
   *player = (player_t) {
     .position = position,
     .rotation = rotation,
@@ -202,15 +192,62 @@ void updatePlayer(player_t* player, vector2_t position, int16_t rotation,
   };
 }
 
-void redrawPlayer(SDL_Renderer* renderer, player_t player) {
+void updatePlayerState(player_t* player, character_state_t state) {
+  player->state = state;
+}
+
+void redrawPlayer(SDL_Renderer* renderer, player_t* player) {
   SDL_Rect rect = {
-    .x = 0,
-    .y = 0,
-    .w = 32,
-    .h = 32
+    .x = player->position.x,
+    .y = player->position.y,
+    .w = 32 * 4,
+    .h = 32 * 4
   };
-  switch (player.state) {
+  switch (player->state) {
   case CHAR_STATE_IDLE:
-    SDL_RenderCopy(renderer, player.sprites.idle[0], NULL, &rect);
+    player->current_frame = 0;
+    SDL_RenderCopy(renderer, player->sprites.idle[0], NULL, &rect);
+    break;
+  case CHAR_STATE_WALKING:
+    SDL_RenderCopy(renderer, player->sprites.walking[player->current_frame], NULL, &rect);
+    printf("CURR FRAME IS %d; TICKS: %d\n", player->current_frame, SDL_GetTicks());
+    if (SDL_GetTicks() >= player->next_anim_frame_time) {
+      player->next_anim_frame_time = SDL_GetTicks() + 500;
+      player->current_frame++;
+    }
+    if (player->current_frame >= 6) { /* TODO: change 6 to something universal idk */
+      player->current_frame = 0;
+      log_info("reached >=7 frames, resetting");
+    }
+    break;
+  default:
+    log_error("redrawPlayer: state isn't found!");
+    break;
+  }
+}
+
+void changeDownedControls(controls_t* controls, controls_button_t button, uint8_t value) {
+  switch (button) {
+  case CONTROLS_WALK_FORWARD:
+    controls->walk_forward = value;
+    break;
+  case CONTROLS_WALK_BACKWARD:
+    controls->walk_backward = value;
+    break;
+  case CONTROLS_WALK_RIGHT:
+    controls->walk_right = value;
+    break;
+  case CONTROLS_WALK_LEFT:
+    controls->walk_left = value;
+    break;
+  case CONTROLS_ATTACK:
+    controls->attack = value;
+    break;
+  case CONTROLS_DRAG_DROP:
+    controls->drag_drop = value;
+    break;
+  case CONTROLS_SPECIAL:
+    controls->special = value;
+    break;
   }
 }
