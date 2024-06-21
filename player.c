@@ -54,16 +54,16 @@ uint8_t dir_count_files(const char* directory) {
   if (dr == NULL) {
     switch (errno) {
     case ENOENT:
-      printf("dir_count_files: opendir returned NULL, directory isn't exist: %s\n", directory);
+      log_error("dir_count_files: opendir returned NULL, directory isn't exist: %s\n", directory);
       break;
     case EACCES:
-      printf("dir_count_files: opendir returned NULL, permission is denied for directory: %s\n", directory);
+      log_error("dir_count_files: opendir returned NULL, permission is denied for directory: %s\n", directory);
       break;
     default:
-      printf("dir_count_files: opendir returned NULL, error unknown, directory: %s\n", directory);
+      log_error("dir_count_files: opendir returned NULL, error unknown, directory: %s\n", directory);
     }
     if (closedir(dr) == -1) {
-      perror("dir_count_files: closedir error\n");
+      log_error("dir_count_files: closedir error\n");
     }
     return 0;
   }
@@ -72,16 +72,16 @@ uint8_t dir_count_files(const char* directory) {
     counter++;
   
   if (closedir(dr) == -1) {
-    printf("Failed to close directory\n");
+    log_error("Failed to close directory\n");
   }
   
-  return counter;
+  return counter - 2;
 }
 
 SDL_Surface* load_image(char* directory) {
   SDL_Surface* image = IMG_Load(directory);
   if (image == NULL) {
-    printf("load_image: Skipped, SDL_image error or image not found: %s\n", directory);
+    log_error("load_image: Skipped, SDL_image error or image not found: %s\n", directory);
     return NULL;
   }
   
@@ -210,9 +210,9 @@ void redrawPlayer(SDL_Renderer* renderer, player_t* player) {
     break;
   case CHAR_STATE_WALKING:
     SDL_RenderCopy(renderer, player->sprites.walking[player->current_frame], NULL, &rect);
-    printf("CURR FRAME IS %d; TICKS: %d\n", player->current_frame, SDL_GetTicks());
+    log_info("CURR FRAME IS %d; TICKS: %d\n", player->current_frame, SDL_GetTicks());
     if (SDL_GetTicks() >= player->next_anim_frame_time) {
-      player->next_anim_frame_time = SDL_GetTicks() + 500;
+      player->next_anim_frame_time = SDL_GetTicks() + 100;
       player->current_frame++;
     }
     if (player->current_frame >= 6) { /* TODO: change 6 to something universal idk */
@@ -248,6 +248,8 @@ void changeDownedControls(controls_t* controls, controls_button_t button, uint8_
     break;
   case CONTROLS_SPECIAL:
     controls->special = value;
+    break;
+  default:
     break;
   }
 }

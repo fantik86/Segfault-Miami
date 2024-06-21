@@ -13,11 +13,10 @@
 
 bool isGameRunning = true;
 
-
 int main() {
 
   setvbuf(stdout, NULL, _IONBF, 0); /* Disabling buffering to make printf work properly */
-  
+  log_error("test%d\n", 2);
   if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS))
     printf("SDL init error: %s", SDL_GetError());
 
@@ -50,7 +49,9 @@ int main() {
     if (SDL_PollEvent(&event)) {
       switch (event.type) {
       case SDL_QUIT:
+	IMG_Quit();
 	SDL_Quit();
+	return 0;
 	break;
       }
 	if (event.type == SDL_KEYUP) {

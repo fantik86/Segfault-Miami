@@ -11,9 +11,9 @@
 #define LOG_PREFIX_ERROR         "\x1b[31;1m" "[ERROR]: " TEXT_RESET     /* Error messages */
 #define LOG_PREFIX_GAME          "\x1b[32;1m" "[GAME]: " TEXT_RESET   /* Game output */
 
-#define log_info(...) printf(LOG_PREFIX_INFO __VA_ARGS__ "\n")
-#define log_error(...) printf(LOG_PREFIX_ERROR __VA_ARGS__ "\n")
-#define log_warn(...) printf(LOG_PREFIX_WARN __VA_ARGS__ "\n")
-#define log_game(...) printf(LOG_PREFIX_GAME __VA_ARGS__ "\n")
+#define log_info(fmt, ...) printf(LOG_PREFIX_INFO fmt "\n", ##__VA_ARGS__)
+#define log_error(fmt, ...) printf(LOG_PREFIX_ERROR fmt "\n", ##__VA_ARGS__)
+#define log_warn(fmt, ...) printf(fmt, LOG_PREFIX_WARN __VA_ARGS__ "\n")
+#define log_game(fmt, ...) printf(fmt, LOG_PREFIX_GAME __VA_ARGS__ "\n")
 
 #endif
